@@ -1,0 +1,36 @@
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+tfplan
+**/lambda_package.zip
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+
+# Secretos — NUNCA commitear
+*.pem
+*.key
+secrets.tfvars
+*secrets*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
