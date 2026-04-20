@@ -44,7 +44,7 @@ resource "aws_scheduler_schedule" "morning" {
   group_name = "default"
 
   flexible_time_window {
-    mode = "OFF"  # Disparo exacto, sin ventana flexible
+    mode = "OFF" # Disparo exacto, sin ventana flexible
   }
 
   # Cron: minuto 0, hora 13 UTC, cada día

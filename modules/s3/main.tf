@@ -38,18 +38,18 @@ resource "aws_s3_bucket_public_access_block" "this" {
 
 # Subir el archivo JSON con la lista de verbos irregulares
 resource "aws_s3_object" "verbs_file" {
-  count   = var.upload_verbs_file ? 1 : 0
-  bucket  = aws_s3_bucket.this.id
-  key     = "data/irregular_verbs.json"
-  content = jsonencode(var.irregular_verbs_list)
+  count        = var.upload_verbs_file ? 1 : 0
+  bucket       = aws_s3_bucket.this.id
+  key          = "data/irregular_verbs.json"
+  content      = jsonencode(var.irregular_verbs_list)
   content_type = "application/json"
 }
 
 # Subir el archivo JSON con la lista de phrasal verbs
 resource "aws_s3_object" "phrasal_verbs_file" {
-  count   = var.upload_verbs_file ? 1 : 0
-  bucket  = aws_s3_bucket.this.id
-  key     = "data/phrasal_verbs.json"
-  content = jsonencode(var.phrasal_verbs_list)
+  count        = var.upload_verbs_file ? 1 : 0
+  bucket       = aws_s3_bucket.this.id
+  key          = "data/phrasal_verbs.json"
+  content      = jsonencode(var.phrasal_verbs_list)
   content_type = "application/json"
 }

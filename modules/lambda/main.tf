@@ -17,21 +17,21 @@ resource "aws_lambda_function" "this" {
   role          = var.lambda_role_arn
   handler       = "handler.lambda_handler"
   runtime       = "python3.12"
-  timeout       = 30    # segundos — suficiente para llamar Bedrock + Twilio
-  memory_size   = 256   # MB
+  timeout       = 30  # segundos — suficiente para llamar Bedrock + Twilio
+  memory_size   = 256 # MB
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
     variables = {
-      ENVIRONMENT       = var.environment
-      PROJECT_NAME      = var.project_name
-      S3_BUCKET         = var.s3_bucket_name
-      DYNAMODB_TABLE    = var.dynamodb_table_name
-      AWS_REGION_NAME   = var.aws_region
-      BEDROCK_MODEL_ID  = var.bedrock_model_id
-      SSM_PREFIX        = "/${var.project_name}/${var.environment}"
+      ENVIRONMENT      = var.environment
+      PROJECT_NAME     = var.project_name
+      S3_BUCKET        = var.s3_bucket_name
+      DYNAMODB_TABLE   = var.dynamodb_table_name
+      AWS_REGION_NAME  = var.aws_region
+      BEDROCK_MODEL_ID = var.bedrock_model_id
+      SSM_PREFIX       = "/${var.project_name}/${var.environment}"
     }
   }
 
