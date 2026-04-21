@@ -33,7 +33,7 @@ variable "dynamodb_table_name" {
 variable "bedrock_model_id" {
   description = "ID del modelo Bedrock a invocar"
   type        = string
-  default     = "anthropic.claude-haiku-4-5-20251001"
+  default     = "amazon.nova-micro-v1:0"
 }
 
 variable "tags" {
