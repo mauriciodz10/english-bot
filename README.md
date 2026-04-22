@@ -1,4 +1,4 @@
-# English Bot — DevOps Project
+# English Sori Bot — DevOps Project
 
 Bot de aprendizaje de inglés que envía lecciones diarias vía WhatsApp,
 construido con AWS, Terraform, GitHub Actions y Amazon Bedrock.
