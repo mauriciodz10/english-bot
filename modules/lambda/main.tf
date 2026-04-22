@@ -1,15 +1,15 @@
 ##############################################################
 # modules/lambda/main.tf
-# Crea la función Lambda.
-# En Fase 1 despliega un placeholder (handler vacío).
-# En Fase 2 se reemplaza con el código real del bot.
 ##############################################################
 
-# ZIP del código Lambda (placeholder o código real)
+# ZIP del código Lambda
+# output_path usa path.root (raíz del workspace de Terraform) en lugar de
+# path.module (directorio del módulo) para que funcione tanto en local
+# como en el runner efímero de GitHub Actions.
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = var.source_dir
-  output_path = "${path.module}/lambda_package.zip"
+  output_path = "${path.root}/lambda_package.zip"
 }
 
 resource "aws_lambda_function" "this" {
@@ -17,8 +17,8 @@ resource "aws_lambda_function" "this" {
   role          = var.lambda_role_arn
   handler       = "handler.lambda_handler"
   runtime       = "python3.12"
-  timeout       = 30  # segundos — suficiente para llamar Bedrock + Twilio
-  memory_size   = 256 # MB
+  timeout       = 30
+  memory_size   = 256
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
@@ -48,7 +48,7 @@ resource "aws_lambda_permission" "scheduler" {
   principal     = "scheduler.amazonaws.com"
 }
 
-# Log group con retención de 30 días (evita costos de logs indefinidos)
+# Log group con retención de 30 días
 resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${aws_lambda_function.this.function_name}"
   retention_in_days = 30
