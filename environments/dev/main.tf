@@ -132,5 +132,5 @@ resource "aws_ssm_parameter" "twilio_whatsapp_from" {
 resource "aws_ssm_parameter" "whatsapp_to" {
   name  = "/${var.project_name}/${var.environment}/whatsapp_to"
   type  = "String"
-  value = "whatsapp:+57XXXXXXXXXX" # Tu número de WhatsApp con código de país
+  value = "whatsapp:+573112187535" # Tu número de WhatsApp con código de país
 }
