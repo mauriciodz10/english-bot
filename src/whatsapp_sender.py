@@ -1,13 +1,6 @@
 """
 whatsapp_sender.py
-Envía mensajes de WhatsApp usando la API de Twilio.
-
-Lee las credenciales desde SSM Parameter Store en cada instancia
-(no en cada invocación — se cachean en el objeto para reutilización).
-
-Twilio WhatsApp API:
-  POST https://api.twilio.com/2010-04-01/Accounts/{SID}/Messages.json
-  Body: From=whatsapp:+14155238886&To=whatsapp:+57XXX&Body=mensaje
+Envía mensajes de WhatsApp a múltiples destinatarios usando la API de Twilio.
 """
 
 import logging
@@ -27,9 +20,8 @@ class WhatsAppSender:
     def __init__(self, ssm_prefix: str, aws_region: str):
         self.ssm        = boto3.client("ssm", region_name=aws_region)
         self.ssm_prefix = ssm_prefix
-        self._creds     = None   # cache de credenciales
+        self._creds     = None
 
-    # ── Lee credenciales de SSM (una sola vez por instancia Lambda) ──────────
     def _load_credentials(self) -> dict:
         if self._creds:
             return self._creds
@@ -38,13 +30,13 @@ class WhatsAppSender:
             f"{self.ssm_prefix}/twilio_account_sid",
             f"{self.ssm_prefix}/twilio_auth_token",
             f"{self.ssm_prefix}/twilio_whatsapp_from",
-            f"{self.ssm_prefix}/whatsapp_to",
+            f"{self.ssm_prefix}/whatsapp_recipients",
         ]
 
         try:
             response = self.ssm.get_parameters(
                 Names=params,
-                WithDecryption=True,   # necesario para SecureString
+                WithDecryption=True,
             )
 
             if response.get("InvalidParameters"):
@@ -54,17 +46,23 @@ class WhatsAppSender:
 
             creds = {p["Name"].split("/")[-1]: p["Value"] for p in response["Parameters"]}
 
+            recipients = [
+                r.strip()
+                for r in creds["whatsapp_recipients"].split(",")
+                if r.strip()
+            ]
+
             self._creds = {
                 "account_sid": creds["twilio_account_sid"],
                 "auth_token":  creds["twilio_auth_token"],
                 "from_number": creds["twilio_whatsapp_from"],
-                "to_number":   creds["whatsapp_to"],
+                "recipients":  recipients,
             }
 
             logger.info(
-                "Credenciales SSM cargadas — from: %s | to: %s",
+                "Credenciales SSM cargadas — from: %s | destinatarios: %d",
                 self._creds["from_number"],
-                self._creds["to_number"],
+                len(recipients),
             )
 
             return self._creds
@@ -73,23 +71,18 @@ class WhatsAppSender:
             logger.error("Error leyendo SSM: %s", e)
             raise
 
-    # ── Envía el mensaje via Twilio API usando urllib (sin dependencias extra) ─
-    def send(self, message: str) -> dict:
-        creds = self._load_credentials()
-
+    def _send_to_number(self, message: str, to_number: str, creds: dict) -> dict:
         url = (
             f"https://api.twilio.com/2010-04-01/Accounts/"
             f"{creds['account_sid']}/Messages.json"
         )
 
-        # Twilio espera form-encoded, no JSON
         data = urllib.parse.urlencode({
             "From": creds["from_number"],
-            "To":   creds["to_number"],
+            "To":   to_number,
             "Body": message,
         }).encode("utf-8")
 
-        # Basic Auth: Account SID + Auth Token en base64
         credentials = base64.b64encode(
             f"{creds['account_sid']}:{creds['auth_token']}".encode()
         ).decode()
@@ -106,21 +99,38 @@ class WhatsAppSender:
 
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
-                body   = json.loads(response.read().decode())
-                msg_sid = body.get("sid", "unknown")
-
+                body = json.loads(response.read().decode())
                 logger.info(
-                    "Mensaje enviado — SID: %s | status: %s | to: %s",
-                    msg_sid,
-                    body.get("status"),
-                    creds["to_number"],
+                    "Enviado — SID: %s | status: %s | to: %s | chars: %d",
+                    body.get("sid"), body.get("status"), to_number, len(message),
                 )
-
-                return {"sid": msg_sid, "status": body.get("status")}
+                return {"to": to_number, "sid": body.get("sid"), "status": body.get("status")}
 
         except urllib.error.HTTPError as e:
             error_body = e.read().decode()
-            logger.error(
-                "Twilio HTTP error %d: %s", e.code, error_body
-            )
-            raise RuntimeError(f"Twilio error {e.code}: {error_body}") from e
+            logger.error("Twilio error %d para %s: %s", e.code, to_number, error_body)
+            return {"to": to_number, "sid": None, "status": "failed", "error": error_body}
+
+    def send(self, message: str) -> list[dict]:
+        """Envía el mensaje a todos los destinatarios."""
+        creds   = self._load_credentials()
+        results = []
+
+        logger.info("Enviando mensaje de %d chars a %d destinatarios", len(message), len(creds["recipients"]))
+
+        for recipient in creds["recipients"]:
+            result = self._send_to_number(message, recipient, creds)
+            results.append(result)
+
+        successful = [r for r in results if r["status"] != "failed"]
+        failed     = [r for r in results if r["status"] == "failed"]
+
+        logger.info(
+            "Envío completado — exitosos: %d | fallidos: %d",
+            len(successful), len(failed),
+        )
+
+        if failed:
+            logger.warning("Fallaron: %s", [r["to"] for r in failed])
+
+        return results

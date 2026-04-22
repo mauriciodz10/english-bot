@@ -37,7 +37,8 @@ Formato de salida:
 - Separa cada verbo con una línea de guiones ---
 - Al final agrega un tip de uso común en inglés cotidiano
 
-Responde SOLO con el contenido de la lección, sin introducciones ni despedidas."""
+Responde SOLO con el contenido de la lección, sin introducciones ni despedidas.
+IMPORTANTE: el texto completo no debe superar 1200 caracteres."""
 
 PHRASAL_VERB_PROMPT = """Eres un profesor de inglés experto. Genera una lección diaria de inglés para un estudiante hispanohablante de nivel intermedio.
 
@@ -55,7 +56,8 @@ Formato de salida:
 - Separa cada phrasal verb con una línea de guiones ---
 - Al final agrega una nota sobre registro (formal/informal)
 
-Responde SOLO con el contenido de la lección, sin introducciones ni despedidas."""
+Responde SOLO con el contenido de la lección, sin introducciones ni despedidas.
+IMPORTANTE: el texto completo no debe superar 1200 caracteres."""
 
 
 class BedrockGenerator:
@@ -93,7 +95,7 @@ class BedrockGenerator:
                         }
                     ],
                     "inferenceConfig": {
-                        "max_new_tokens": 1500,
+                        "max_new_tokens": 900,
                         "temperature":    0.7,
                     },
                 }),
@@ -103,9 +105,10 @@ class BedrockGenerator:
             content = body["output"]["message"]["content"][0]["text"]
 
             logger.info(
-                "Bedrock respondió — tokens entrada: %d | tokens salida: %d",
+                "Bedrock respondió — tokens entrada: %d | tokens salida: %d | chars: %d",
                 body["usage"]["inputTokens"],
                 body["usage"]["outputTokens"],
+                len(content),
             )
 
             return content

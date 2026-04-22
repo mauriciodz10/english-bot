@@ -16,7 +16,7 @@ terraform {
   # Remote state en el bucket creado por global/
   # Reemplaza BUCKET_NAME con el output de: cd global && terraform output tf_state_bucket
   backend "s3" {
-    bucket         = "english-bot-tf-state-032983035465" # <-- actualizar
+    bucket         = "english-bot-tf-state-TU_ACCOUNT_ID"  # <-- actualizar
     key            = "environments/dev/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "english-bot-tf-lock"
@@ -45,10 +45,10 @@ locals {
 module "s3" {
   source = "../../modules/s3"
 
-  bucket_name        = "${var.project_name}-assets-${var.environment}-${var.aws_account_id}"
-  versioning_enabled = true
-  upload_verbs_file  = true # Sube los JSON de verbos al crear la infra
-  tags               = local.common_tags
+  bucket_name          = "${var.project_name}-assets-${var.environment}-${var.aws_account_id}"
+  versioning_enabled   = true
+  upload_verbs_file    = true   # Sube los JSON de verbos al crear la infra
+  tags                 = local.common_tags
 }
 
 # ── 2. DynamoDB: tabla de log de verbos enviados ──
@@ -56,9 +56,9 @@ module "dynamodb" {
   source = "../../modules/dynamodb"
 
   table_name    = "${var.project_name}-sent-log-${var.environment}"
-  hash_key      = "PK"         # Ej: "irregular_verbs" o "phrasal_verbs"
-  range_key     = "SK"         # Ej: fecha ISO "2025-03-20"
-  ttl_attribute = "expires_at" # Auto-expirar registros viejos (opcional)
+  hash_key      = "PK"           # Ej: "irregular_verbs" o "phrasal_verbs"
+  range_key     = "SK"           # Ej: fecha ISO "2025-03-20"
+  ttl_attribute = "expires_at"   # Auto-expirar registros viejos (opcional)
   tags          = local.common_tags
 }
 
@@ -66,10 +66,10 @@ module "dynamodb" {
 module "iam" {
   source = "../../modules/iam"
 
-  project_name   = var.project_name
-  environment    = var.environment
-  aws_region     = var.aws_region
-  aws_account_id = var.aws_account_id
+  project_name    = var.project_name
+  environment     = var.environment
+  aws_region      = var.aws_region
+  aws_account_id  = var.aws_account_id
 
   dynamodb_table_arns = [module.dynamodb.table_arn]
   s3_bucket_arns      = [module.s3.bucket_arn]
@@ -106,10 +106,10 @@ module "scheduler" {
 resource "aws_ssm_parameter" "twilio_account_sid" {
   name  = "/${var.project_name}/${var.environment}/twilio_account_sid"
   type  = "SecureString"
-  value = "PLACEHOLDER" # Actualizar manualmente en la consola AWS o con AWS CLI
+  value = "PLACEHOLDER"   # Actualizar manualmente en la consola AWS o con AWS CLI
 
   lifecycle {
-    ignore_changes = [value] # Terraform no sobreescribe el valor real
+    ignore_changes = [value]   # Terraform no sobreescribe el valor real
   }
 }
 
@@ -126,11 +126,20 @@ resource "aws_ssm_parameter" "twilio_auth_token" {
 resource "aws_ssm_parameter" "twilio_whatsapp_from" {
   name  = "/${var.project_name}/${var.environment}/twilio_whatsapp_from"
   type  = "String"
-  value = "whatsapp:+14155238886" # Número sandbox de Twilio (actualizar en prod)
+  value = "whatsapp:+14155238886"   # Número sandbox de Twilio (actualizar en prod)
 }
 
 resource "aws_ssm_parameter" "whatsapp_to" {
   name  = "/${var.project_name}/${var.environment}/whatsapp_to"
   type  = "String"
-  value = "whatsapp:+573112187535" # Tu número de WhatsApp con código de país
+  value = "whatsapp:+57XXXXXXXXXX"  # Tu número de WhatsApp con código de país
+}
+resource "aws_ssm_parameter" "whatsapp_recipients" {
+  name  = "/${var.project_name}/${var.environment}/whatsapp_recipients"
+  type  = "String"
+  value = "PLACEHOLDER"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
 }
