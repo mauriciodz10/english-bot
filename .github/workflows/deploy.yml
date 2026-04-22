@@ -2,7 +2,11 @@
 # .github/workflows/deploy.yml
 # CI/CD pipeline del english-bot:
 #   - Pull Request → terraform fmt + validate + plan (sin apply)
-#   - Push a main  → terraform apply automático
+#   - Push a main  → terraform plan + apply en el mismo job
+#
+# NOTA: plan y apply corren en el mismo job para que el ZIP
+# generado por archive_file durante el plan siga disponible
+# en el filesystem cuando se ejecuta el apply.
 ##############################################################
 
 name: Deploy English Bot
@@ -16,17 +20,17 @@ on:
       - main
 
 env:
-  AWS_REGION:      us-east-1
-  TF_VERSION:      1.7.5
-  WORKING_DIR:     environments/dev
+  AWS_REGION:  us-east-1
+  TF_VERSION:  1.7.5
+  WORKING_DIR: environments/dev
 
 permissions:
-  id-token:      write   # OIDC auth con AWS (sin access keys hardcodeadas)
+  id-token:      write
   contents:      read
-  pull-requests: write   # Para comentar el plan en el PR
+  pull-requests: write
 
 jobs:
-  # ── JOB 1: Validación y plan (corre en PR y en push a main) ──
+  # ── JOB 1: Plan (PR y push a main) ──────────────────────────────────────
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
@@ -70,7 +74,6 @@ jobs:
             -out=tfplan 2>&1 | tee plan_output.txt
         continue-on-error: true
 
-      # Publica el resultado del plan como comentario en el PR
       - name: Comentar Plan en PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -93,16 +96,7 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-      # Guarda el plan para usarlo en el job de apply
-      - name: Subir plan como artefacto
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan
-          path: ${{ env.WORKING_DIR }}/tfplan
-          retention-days: 1
-
-  # ── JOB 2: Apply (solo en push a main, después del plan exitoso) ──
+  # ── JOB 2: Apply (mismo runner que el plan para conservar el ZIP) ────────
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
@@ -110,7 +104,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     environment:
-      name: dev   # Requiere aprobación manual si configuras "required reviewers" en GitHub
+      name: dev
 
     steps:
       - name: Checkout código
@@ -132,12 +126,11 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: terraform init -input=false
 
-      - name: Descargar plan
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan
-          path: ${{ env.WORKING_DIR }}
-
+      # El apply regenera el ZIP en el mismo runner — no depende de artefactos
       - name: Terraform Apply
         working-directory: ${{ env.WORKING_DIR }}
-        run: terraform apply -input=false -auto-approve tfplan
+        run: |
+          terraform apply \
+            -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}" \
+            -input=false \
+            -auto-approve
