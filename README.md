@@ -1,7 +1,48 @@
-# English Sori Bot — DevOps Project
+# English Bot 🇬🇧
 
-Bot de aprendizaje de inglés que envía lecciones diarias vía WhatsApp,
-construido con AWS, Terraform, GitHub Actions y Amazon Bedrock.
+Bot de aprendizaje de inglés que envía lecciones diarias vía WhatsApp, construido con AWS, Terraform, GitHub Actions y Amazon Bedrock.
+
+Cada día el bot envía automáticamente:
+- **8:00am (COT)** — 2 verbos irregulares con sus formas y ejemplos en 5 tiempos gramaticales
+- **3:00pm (COT)** — 2 phrasal verbs con significado, ejemplos en contexto y tips de uso
+
+Las lecciones son generadas por IA (Amazon Nova Micro vía Bedrock) y entregadas a múltiples destinatarios en WhatsApp vía Twilio.
+
+---
+
+## Arquitectura
+
+```
+GitHub Actions (CI/CD)
+    └── Terraform → AWS
+            ├── EventBridge Scheduler (8am / 3pm COT)
+            │       └── Lambda (orquestador)
+            │               ├── S3 (lista de verbos)
+            │               ├── DynamoDB (log de verbos enviados)
+            │               ├── Bedrock / Nova Micro (generación con IA)
+            │               ├── SSM Parameter Store (credenciales)
+            │               └── Twilio API → WhatsApp
+            └── Observabilidad
+                    ├── CloudWatch Dashboard
+                    ├── Alarmas (errores, duración, zero invocations)
+                    └── SNS → Email
+```
+
+## Stack tecnológico
+
+| Capa | Tecnología |
+|------|-----------|
+| IaC | Terraform >= 1.6 con módulos reutilizables |
+| CI/CD | GitHub Actions + OIDC (sin access keys) |
+| Cómputo | AWS Lambda (Python 3.12) |
+| IA | Amazon Bedrock — Amazon Nova Micro |
+| Almacenamiento | S3 (lista de verbos), DynamoDB (estado) |
+| Secretos | SSM Parameter Store |
+| Scheduling | EventBridge Scheduler |
+| Mensajería | Twilio WhatsApp API |
+| Observabilidad | CloudWatch Dashboard + Alarmas + SNS |
+
+---
 
 ## Estructura del proyecto
 
@@ -9,9 +50,9 @@ construido con AWS, Terraform, GitHub Actions y Amazon Bedrock.
 english-bot/
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml          # CI/CD pipeline
+│       └── deploy.yml          # CI/CD: plan en PR, apply en merge a main
 ├── global/                     # Remote state backend (se aplica UNA SOLA VEZ)
-│   ├── main.tf
+│   ├── main.tf                 # S3 + DynamoDB para Terraform state
 │   ├── variables.tf
 │   ├── outputs.tf
 │   └── terraform.tfvars
@@ -20,38 +61,53 @@ english-bot/
 │   ├── dynamodb/               # Tabla de log de verbos enviados
 │   ├── iam/                    # Rol y políticas para Lambda
 │   ├── lambda/                 # Función Lambda orquestadora
-│   └── scheduler/              # EventBridge Schedules AM y PM
+│   ├── scheduler/              # EventBridge Schedules AM y PM
+│   └── observability/          # Dashboard, alarmas y SNS
 ├── environments/
 │   └── dev/                    # Environment de desarrollo
 │       ├── main.tf             # Instancia todos los módulos
 │       ├── variables.tf
 │       ├── outputs.tf
 │       └── terraform.tfvars
-└── src/
-    └── handler.py              # Código Lambda (placeholder en Fase 1)
+├── src/                        # Código fuente de la Lambda
+│   ├── handler.py              # Orquestador principal
+│   ├── verb_selector.py        # Selección aleatoria sin repetir
+│   ├── bedrock_generator.py    # Generación de lecciones con IA
+│   └── whatsapp_sender.py      # Envío a WhatsApp vía Twilio
+└── scripts/
+    ├── test_local.py           # Pruebas locales sin deploy
+    └── enable_bedrock.sh       # Verificación de acceso a Bedrock
 ```
+
+---
 
 ## Prerrequisitos
 
 - AWS CLI configurado (`aws configure`)
 - Terraform >= 1.6.0
-- Python 3.12
-- Cuenta en GitHub con el repo creado
+- Python 3.12 + pip
+- Cuenta GitHub con el repo creado
+- Cuenta Twilio con sandbox de WhatsApp activo
 
-## Fase 1: Despliegue inicial
+---
 
-### Paso 1 — Obtener tu Account ID
+## Despliegue inicial
+
+### 1. Obtener Account ID
 
 ```bash
-aws sts get-caller-identity --query Account --output text
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+echo "Account ID: $AWS_ACCOUNT_ID"
 ```
 
-Reemplaza `TU_ACCOUNT_ID_AQUI` en:
-- `global/terraform.tfvars`
-- `environments/dev/terraform.tfvars`
-- `environments/dev/main.tf` (el backend S3)
+### 2. Configurar variables
 
-### Paso 2 — Aplicar el global (solo la primera vez)
+Reemplaza los placeholders en:
+- `global/terraform.tfvars` → `aws_account_id`
+- `environments/dev/terraform.tfvars` → `aws_account_id`, `alert_email`
+- `environments/dev/main.tf` → bucket del backend S3
+
+### 3. Aplicar el global (una sola vez)
 
 ```bash
 cd global
@@ -59,120 +115,156 @@ terraform init
 terraform apply
 ```
 
-Esto crea el bucket S3 de remote state y la tabla DynamoDB de locking.
-Anota el output `tf_state_bucket` y actualízalo en el backend de `environments/dev/main.tf`.
-
-### Paso 3 — Inicializar y aplicar el environment dev
+### 4. Aplicar el environment dev
 
 ```bash
-cd ../environments/dev
+cd environments/dev
 terraform init
-terraform plan
 terraform apply
 ```
 
-### Paso 4 — Verificar los recursos creados
+### 5. Cargar credenciales de Twilio en SSM
 
 ```bash
-# Ver outputs
-terraform output
-
-# Invocar la Lambda manualmente para confirmar que funciona
-aws lambda invoke \
-  --function-name english-bot-dev-bot \
-  --payload '{"lesson_type":"irregular_verbs","schedule":"morning"}' \
-  --cli-binary-format raw-in-base64-out \
-  response.json && cat response.json
-
-# Ver logs de la invocación
-aws logs tail /aws/lambda/english-bot-dev-bot --follow
-```
-
-### Paso 5 — Cargar las credenciales de Twilio en SSM
-
-```bash
-# Obtenlas en: https://console.twilio.com
 aws ssm put-parameter \
   --name "/english-bot/dev/twilio_account_sid" \
   --value "ACxxxxxxxxxxxxxxxx" \
-  --type SecureString \
-  --overwrite
+  --type SecureString --overwrite
 
 aws ssm put-parameter \
   --name "/english-bot/dev/twilio_auth_token" \
   --value "tu_auth_token" \
-  --type SecureString \
-  --overwrite
+  --type SecureString --overwrite
 
-# Actualizar tu número de WhatsApp destino
 aws ssm put-parameter \
-  --name "/english-bot/dev/whatsapp_to" \
-  --value "whatsapp:+57XXXXXXXXXX" \
-  --type String \
-  --overwrite
+  --name "/english-bot/dev/whatsapp_recipients" \
+  --value "whatsapp:+57XXX,whatsapp:+57YYY" \
+  --type String --overwrite
 ```
 
-## Configurar GitHub Actions (CI/CD)
+### 6. Confirmar suscripción email de SNS
 
-### 1. Crear el OIDC provider en AWS
+Después del apply, AWS envía un email con asunto `AWS Notification - Subscription Confirmation`. Haz clic en el link para activar las alertas por email.
+
+---
+
+## CI/CD con GitHub Actions
+
+El pipeline usa autenticación OIDC — sin access keys hardcodeadas en el repo.
+
+### Configurar OIDC
 
 ```bash
-# Permite que GitHub Actions se autentique en AWS sin access keys
+# Crear el OIDC provider en AWS
 aws iam create-open-id-connect-provider \
   --url https://token.actions.githubusercontent.com \
   --client-id-list sts.amazonaws.com \
   --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+
+# Crear el rol para GitHub Actions
+aws iam create-role \
+  --role-name github-actions-english-bot \
+  --assume-role-policy-document file:///tmp/github-trust-policy.json
+
+aws iam attach-role-policy \
+  --role-name github-actions-english-bot \
+  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
 ```
 
-### 2. Crear el IAM Role para GitHub Actions
+### Secrets en GitHub
 
-Crea un rol `github-actions-english-bot` con este trust policy
-(reemplaza `TU_GITHUB_USER` y `TU_REPO`):
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {
-      "Federated": "arn:aws:iam::TU_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
-    },
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-      "StringEquals": {
-        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-      },
-      "StringLike": {
-        "token.actions.githubusercontent.com:sub": "repo:TU_GITHUB_USER/TU_REPO:*"
-      }
-    }
-  }]
-}
-```
-
-Adjunta la política `AdministratorAccess` al rol (en prod usar mínimo privilegio).
-
-### 3. Agregar secrets en GitHub
-
-En tu repo: Settings → Secrets and variables → Actions
+En Settings → Secrets and variables → Actions:
 
 | Secret | Valor |
 |--------|-------|
-| `AWS_ROLE_ARN` | `arn:aws:iam::TU_ACCOUNT_ID:role/github-actions-english-bot` |
+| `AWS_ROLE_ARN` | `arn:aws:iam::ACCOUNT_ID:role/github-actions-english-bot` |
 | `AWS_ACCOUNT_ID` | Tu Account ID de AWS |
 
-## Flujo CI/CD
+### Flujo del pipeline
 
 ```
 Pull Request → terraform fmt + validate + plan  (resultado como comentario en el PR)
 Merge a main → terraform apply automático
 ```
 
+---
+
+## Pruebas locales
+
+```bash
+# Crear entorno virtual
+python3 -m venv .venv && source .venv/bin/activate
+pip install boto3
+
+# Dry-run (genera lección sin enviar a WhatsApp)
+python3 scripts/test_local.py --type irregular_verbs --dry-run
+python3 scripts/test_local.py --type phrasal_verbs --dry-run
+
+# Prueba completa con envío real
+python3 scripts/test_local.py --type irregular_verbs
+```
+
+## Invocar la Lambda manualmente
+
+```bash
+aws lambda invoke \
+  --function-name english-bot-dev-bot \
+  --payload '{"lesson_type":"irregular_verbs","schedule":"morning"}' \
+  --cli-binary-format raw-in-base64-out \
+  response.json && cat response.json
+
+# Ver logs en tiempo real
+aws logs tail /aws/lambda/english-bot-dev-bot --follow
+```
+
+---
+
+## Observabilidad
+
+```bash
+# Ver URL del dashboard
+terraform output dashboard_url
+
+# Ver estado de las alarmas
+aws cloudwatch describe-alarms \
+  --alarm-name-prefix "english-bot-dev" \
+  --query "MetricAlarms[].{Nombre:AlarmName,Estado:StateValue}" \
+  --output table
+```
+
+### Alarmas configuradas
+
+| Alarma | Condición | Acción |
+|--------|-----------|--------|
+| `lambda-errors` | >= 1 error en 5 min | Email |
+| `lambda-duration` | > 20 segundos | Email |
+| `no-invocations` | 0 invocaciones en 24h | Email |
+
+---
+
+## Destruir la infraestructura
+
+```bash
+# 1. Destruir el environment primero
+cd environments/dev
+terraform destroy
+
+# 2. Vaciar buckets S3 antes de destruir el global
+aws s3 rm s3://english-bot-assets-dev-ACCOUNT_ID --recursive
+aws s3 rm s3://english-bot-tf-state-ACCOUNT_ID --recursive
+
+# 3. Destruir el global
+cd ../../global
+terraform destroy
+```
+
+---
+
 ## Fases del proyecto
 
-| Fase | Descripción | Estado |
-|------|-------------|--------|
-| 1 | Infraestructura base (Terraform + CI/CD) | ✅ Esta fase |
-| 2 | Lambda + Amazon Bedrock (generación de lecciones) | Pendiente |
-| 3 | Integración Twilio → WhatsApp | Pendiente |
-| 4 | Observabilidad (CloudWatch + alarmas) | Pendiente |
+| Fase | Descripción |
+|------|-------------|
+| 1 | Infraestructura base con Terraform modular + CI/CD con GitHub Actions + OIDC |
+| 2 | Lambda + Amazon Bedrock (Nova Micro) + selección aleatoria sin repetir |
+| 3 | Integración WhatsApp vía Twilio + múltiples destinatarios + secretos en SSM |
+| 4 | CloudWatch Dashboard + alarmas + notificaciones SNS por email |
