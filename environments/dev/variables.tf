@@ -21,5 +21,10 @@ variable "aws_account_id" {
 variable "bedrock_model_id" {
   description = "Modelo de Bedrock para generar las lecciones"
   type        = string
-  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  default     = "anthropic.claude-haiku-4-5-20251001"
+}
+
+variable "alert_email" {
+  description = "Email para recibir notificaciones de alerta"
+  type        = string
 }

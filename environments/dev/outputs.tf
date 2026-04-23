@@ -24,3 +24,13 @@ output "morning_schedule_arn" {
 output "afternoon_schedule_arn" {
   value = module.scheduler.afternoon_schedule_arn
 }
+
+output "dashboard_url" {
+  description = "URL del CloudWatch Dashboard"
+  value       = module.observability.dashboard_url
+}
+
+output "sns_topic_arn" {
+  description = "ARN del SNS topic de alertas"
+  value       = module.observability.sns_topic_arn
+}

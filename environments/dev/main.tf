@@ -132,7 +132,7 @@ resource "aws_ssm_parameter" "twilio_whatsapp_from" {
 resource "aws_ssm_parameter" "whatsapp_to" {
   name  = "/${var.project_name}/${var.environment}/whatsapp_to"
   type  = "String"
-  value = "whatsapp:+573112187535" # Tu número de WhatsApp con código de país
+  value = "whatsapp:+57XXXXXXXXXX" # Tu número de WhatsApp con código de país
 }
 resource "aws_ssm_parameter" "whatsapp_recipients" {
   name  = "/${var.project_name}/${var.environment}/whatsapp_recipients"
@@ -142,4 +142,17 @@ resource "aws_ssm_parameter" "whatsapp_recipients" {
   lifecycle {
     ignore_changes = [value]
   }
+}
+
+# ── 6. Observabilidad: alarmas, dashboard y alertas ──
+module "observability" {
+  source = "../../modules/observability"
+
+  project_name         = var.project_name
+  environment          = var.environment
+  aws_region           = var.aws_region
+  aws_account_id       = var.aws_account_id
+  lambda_function_name = module.lambda.function_name
+  alert_email          = var.alert_email
+  tags                 = local.common_tags
 }
