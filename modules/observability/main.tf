@@ -107,6 +107,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           title  = "Invocaciones diarias"
           view   = "timeSeries"
           period = 86400
+          region = var.aws_region
           metrics = [[
             "AWS/Lambda", "Invocations",
             "FunctionName", var.lambda_function_name,
@@ -123,6 +124,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         properties = {
           title  = "Errores"
           view   = "timeSeries"
+          region = var.aws_region
           period = 300
           metrics = [[
             "AWS/Lambda", "Errors",
@@ -140,6 +142,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         properties = {
           title  = "Duración (ms)"
           view   = "timeSeries"
+          region = var.aws_region
           period = 300
           metrics = [
             [
