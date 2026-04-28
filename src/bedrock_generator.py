@@ -60,6 +60,25 @@ Responde SOLO con el contenido de la lección, sin introducciones ni despedidas.
 IMPORTANTE: el texto completo no debe superar 1200 caracteres."""
 
 
+VOCABULARY_PROMPT = """Eres un profesor de inglés cercano y motivador. Crea una cápsula de vocabulario para un estudiante hispanohablante que quiere alcanzar nivel B2-C1.
+
+Palabras de hoy: {words}
+
+Para CADA palabra usa exactamente este formato:
+
+🔹 *PALABRA* — traducción
+📌 Nivel: B2 / C1
+💬 Uso: una línea corta explicando en qué contexto se usa
+• Ejemplo: oración natural en inglés
+
+Separa cada palabra con ---
+
+Reglas:
+- Ejemplos de máximo 10 palabras
+- Palabras sofisticadas pero de uso real (no arcaicas)
+- Sin introducciones ni despedidas
+- El texto completo no debe superar 1200 caracteres."""
+
 class BedrockGenerator:
     def __init__(self, model_id: str, aws_region: str):
         self.client   = boto3.client("bedrock-runtime", region_name=aws_region)
@@ -71,6 +90,8 @@ class BedrockGenerator:
             return IRREGULAR_VERB_PROMPT.format(verbs=verbs_str)
         elif lesson_type == "phrasal_verbs":
             return PHRASAL_VERB_PROMPT.format(verbs=verbs_str)
+        elif lesson_type == "vocabulary":
+            return VOCABULARY_PROMPT.format(words=verbs_str)
         else:
             raise ValueError(f"lesson_type inválido: {lesson_type}")
 
@@ -128,6 +149,7 @@ class BedrockGenerator:
         headers = {
             "irregular_verbs": "🇬🇧 *Lección de hoy — Verbos Irregulares* 📚",
             "phrasal_verbs":   "🇬🇧 *Lección de hoy — Phrasal Verbs* 💬",
+            "vocabulary":      "🇬🇧 *Vocabulario del día — B2/C1* 🧠",
         }
         header        = headers.get(lesson_type, "🇬🇧 *Lección de inglés*")
         verbs_display = " & ".join(f"*{v}*" for v in verbs)

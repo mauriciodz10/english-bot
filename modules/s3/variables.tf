@@ -56,3 +56,33 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "vocabulary_list" {
+  description = "Lista de palabras de vocabulario B2/C1"
+  type        = list(string)
+  default = [
+    "abundant", "acknowledge", "acquire", "adequate", "adjacent",
+    "advocate", "allocate", "ambiguous", "ambivalent", "anticipate",
+    "articulate", "assert", "assess", "assume", "attribute",
+    "authentic", "beneficial", "bias", "candid", "capability",
+    "cautious", "coherent", "collaborate", "commence", "compel",
+    "competent", "complement", "comprehensive", "concede", "concise",
+    "conducive", "confront", "contemplate", "contradict", "controversial",
+    "convey", "cope", "crucial", "deduce", "deliberate",
+    "demonstrate", "depict", "derive", "designate", "despite",
+    "diminish", "discern", "dismiss", "disparity", "disrupt",
+    "diverse", "elaborate", "emphasize", "endeavor", "enhance",
+    "establish", "evaluate", "evolve", "explicit", "facilitate",
+    "feasible", "foster", "fundamental", "generate", "grasp",
+    "highlight", "hinder", "hypothesis", "implement", "imply",
+    "incorporate", "inevitable", "influence", "inherent", "innovate",
+    "insightful", "integrate", "interpret", "intuitive", "justify",
+    "leverage", "meticulous", "mitigate", "negotiate", "nuance",
+    "objective", "obtain", "overlook", "perceive", "persevere",
+    "perspective", "persuade", "pragmatic", "presume", "prioritize",
+    "profound", "pursue", "refine", "reinforce", "relevant",
+    "resilient", "retain", "scrutinize", "substantial", "subtle",
+    "sustain", "synthesize", "tackle", "threshold", "transpose",
+    "undermine", "validate", "versatile", "vulnerable", "yield"
+  ]
+}

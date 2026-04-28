@@ -1,12 +1,11 @@
 ##############################################################
 # modules/scheduler/main.tf
-# Crea dos EventBridge Schedules:
-#   - Mañana: 8:00am COT (13:00 UTC) → verbos irregulares
-#   - Tarde:  3:00pm COT (20:00 UTC) → phrasal verbs
-# COT = UTC-5
+# Tres EventBridge Schedules:
+#   - 9:30am  COT (14:30 UTC) → vocabulario B2/C1
+#   - 2:30pm  COT (19:30 UTC) → verbos irregulares
+#   - 8:30pm  COT (01:30 UTC) → phrasal verbs
 ##############################################################
 
-# Rol IAM que EventBridge asume para invocar Lambda
 data "aws_iam_policy_document" "scheduler_trust" {
   statement {
     effect  = "Allow"
@@ -38,32 +37,30 @@ resource "aws_iam_role_policy" "invoke_lambda" {
   policy = data.aws_iam_policy_document.invoke_lambda.json
 }
 
-# ── Schedule de la MAÑANA: verbos irregulares (8:00am COT = 13:00 UTC) ──
-resource "aws_scheduler_schedule" "morning" {
-  name       = "${var.project_name}-${var.environment}-morning"
+# ── 9:30am COT → Vocabulario B2/C1 ───────────────────────────────────────────
+resource "aws_scheduler_schedule" "vocabulary" {
+  name       = "${var.project_name}-${var.environment}-vocabulary"
   group_name = "default"
 
   flexible_time_window {
-    mode = "OFF" # Disparo exacto, sin ventana flexible
+    mode = "OFF"
   }
 
-  # Cron: minuto 0, hora 13 UTC, cada día
-  schedule_expression          = "cron(0 13 * * ? *)"
+  schedule_expression          = "cron(30 14 * * ? *)"
   schedule_expression_timezone = "America/Bogota"
 
   target {
     arn      = var.lambda_arn
     role_arn = aws_iam_role.scheduler.arn
 
-    # Payload que recibe Lambda para saber qué tipo de lección generar
     input = jsonencode({
-      lesson_type = "irregular_verbs"
+      lesson_type = "vocabulary"
       schedule    = "morning"
     })
   }
 }
 
-# ── Schedule de la TARDE: phrasal verbs (3:00pm COT = 20:00 UTC) ──
+# ── 2:30pm COT → Verbos irregulares ──────────────────────────────────────────
 resource "aws_scheduler_schedule" "afternoon" {
   name       = "${var.project_name}-${var.environment}-afternoon"
   group_name = "default"
@@ -72,7 +69,30 @@ resource "aws_scheduler_schedule" "afternoon" {
     mode = "OFF"
   }
 
-  schedule_expression          = "cron(0 20 * * ? *)"
+  schedule_expression          = "cron(30 19 * * ? *)"
+  schedule_expression_timezone = "America/Bogota"
+
+  target {
+    arn      = var.lambda_arn
+    role_arn = aws_iam_role.scheduler.arn
+
+    input = jsonencode({
+      lesson_type = "irregular_verbs"
+      schedule    = "afternoon"
+    })
+  }
+}
+
+# ── 8:30pm COT → Phrasal verbs ────────────────────────────────────────────────
+resource "aws_scheduler_schedule" "evening" {
+  name       = "${var.project_name}-${var.environment}-evening"
+  group_name = "default"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  schedule_expression          = "cron(30 1 * * ? *)"
   schedule_expression_timezone = "America/Bogota"
 
   target {
@@ -81,7 +101,7 @@ resource "aws_scheduler_schedule" "afternoon" {
 
     input = jsonencode({
       lesson_type = "phrasal_verbs"
-      schedule    = "afternoon"
+      schedule    = "evening"
     })
   }
 }

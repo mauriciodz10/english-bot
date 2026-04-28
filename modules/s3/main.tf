@@ -53,3 +53,12 @@ resource "aws_s3_object" "phrasal_verbs_file" {
   content      = jsonencode(var.phrasal_verbs_list)
   content_type = "application/json"
 }
+
+# Subir el archivo JSON con la lista de vocabulario B2/C1
+resource "aws_s3_object" "vocabulary_file" {
+  count        = var.upload_verbs_file ? 1 : 0
+  bucket       = aws_s3_bucket.this.id
+  key          = "data/vocabulary.json"
+  content      = jsonencode(var.vocabulary_list)
+  content_type = "application/json"
+}

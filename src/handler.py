@@ -43,7 +43,7 @@ def lambda_handler(event: dict, context) -> dict:
     lesson_type = event.get("lesson_type")
     schedule    = event.get("schedule")
 
-    if lesson_type not in ("irregular_verbs", "phrasal_verbs"):
+    if lesson_type not in ("irregular_verbs", "phrasal_verbs", "vocabulary"):
         raise ValueError(f"lesson_type inválido: '{lesson_type}'.")
 
     logger.info("Procesando lección — tipo: %s | horario: %s", lesson_type, schedule)

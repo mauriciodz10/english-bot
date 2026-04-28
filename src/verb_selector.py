@@ -8,7 +8,7 @@ Estrategia:
 - Cada invocación selecciona 2 verbos que no hayan salido en el ciclo
 
 Estructura del item en DynamoDB:
-  PK = "irregular_verbs" | "phrasal_verbs"
+  PK = "irregular_verbs" | "phrasal_verbs" | "vocabulary"
   SK = "state"
   sent    = ["be", "go", "have", ...]   # verbos ya enviados en este ciclo
   cycle   = 3                            # número de ciclo (para métricas)
@@ -38,6 +38,7 @@ class VerbSelector:
         key_map = {
             "irregular_verbs": "data/irregular_verbs.json",
             "phrasal_verbs":   "data/phrasal_verbs.json",
+            "vocabulary":      "data/vocabulary.json",
         }
         key = key_map.get(lesson_type)
         if not key:
@@ -82,7 +83,7 @@ class VerbSelector:
             lesson_type, len(sent), cycle,
         )
 
-    # ── Lógica principal: selecciona 2 verbos sin repetir ───────────────────
+    # ── Lógica principal: selecciona N items sin repetir ────────────────────
     def select(self, lesson_type: str, count: int = 2) -> tuple[list[str], int]:
         """
         Retorna (verbos_seleccionados, numero_de_ciclo).
