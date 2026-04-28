@@ -17,12 +17,19 @@ output "dynamodb_table_name" {
   value       = module.dynamodb.table_name
 }
 
-output "morning_schedule_arn" {
-  value = module.scheduler.morning_schedule_arn
+output "vocabulary_schedule_arn" {
+  description = "ARN del schedule de vocabulario (9:30am COT)"
+  value       = module.scheduler.vocabulary_schedule_arn
 }
 
 output "afternoon_schedule_arn" {
-  value = module.scheduler.afternoon_schedule_arn
+  description = "ARN del schedule de verbos irregulares (2:30pm COT)"
+  value       = module.scheduler.afternoon_schedule_arn
+}
+
+output "evening_schedule_arn" {
+  description = "ARN del schedule de phrasal verbs (8:30pm COT)"
+  value       = module.scheduler.evening_schedule_arn
 }
 
 output "dashboard_url" {
