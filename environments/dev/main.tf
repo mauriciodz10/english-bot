@@ -16,7 +16,7 @@ terraform {
   # Remote state en el bucket creado por global/
   # Reemplaza BUCKET_NAME con el output de: cd global && terraform output tf_state_bucket
   backend "s3" {
-    bucket         = "english-bot-tf-state-TU_ACCOUNT_ID" # <-- actualizar
+    bucket         = "english-bot-tf-state-032983035465" # <-- actualizar
     key            = "environments/dev/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "english-bot-tf-lock"
