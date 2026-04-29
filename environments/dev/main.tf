@@ -129,11 +129,7 @@ resource "aws_ssm_parameter" "twilio_whatsapp_from" {
   value = "whatsapp:+14155238886" # Número sandbox de Twilio (actualizar en prod)
 }
 
-resource "aws_ssm_parameter" "whatsapp_to" {
-  name  = "/${var.project_name}/${var.environment}/whatsapp_to"
-  type  = "String"
-  value = "whatsapp:+57XXXXXXXXXX" # Tu número de WhatsApp con código de país
-}
+
 resource "aws_ssm_parameter" "whatsapp_recipients" {
   name  = "/${var.project_name}/${var.environment}/whatsapp_recipients"
   type  = "String"

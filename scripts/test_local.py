@@ -21,7 +21,7 @@ def main():
     parser = argparse.ArgumentParser(description="Test local del English Bot Lambda")
     parser.add_argument(
         "--type",
-        choices=["irregular_verbs", "phrasal_verbs"],
+        choices=["irregular_verbs", "phrasal_verbs", "vocabulary"],
         default="irregular_verbs",
     )
     parser.add_argument("--env",        default="dev")
