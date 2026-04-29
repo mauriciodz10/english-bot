@@ -1,12 +1,13 @@
 # English Bot 🇬🇧
 
-Bot de aprendizaje de inglés que envía lecciones diarias vía WhatsApp, construido con AWS, Terraform, GitHub Actions y Amazon Bedrock.
+Bot de aprendizaje de inglés que envía lecciones diarias automáticas a un grupo de Telegram, construido con AWS, Terraform, GitHub Actions y Amazon Bedrock.
 
-Cada día el bot envía automáticamente:
-- **8:00am (COT)** — 2 verbos irregulares con sus formas y ejemplos en 5 tiempos gramaticales
-- **3:00pm (COT)** — 2 phrasal verbs con significado, ejemplos en contexto y tips de uso
+Cada día (lunes a sábado) el bot envía:
+- **9:30am (COT)** — 3 palabras de vocabulario nivel B2/C1
+- **2:30pm (COT)** — 2 verbos irregulares con formas y ejemplos en 5 tiempos gramaticales
+- **8:30pm (COT)** — 2 phrasal verbs con significado, ejemplos en contexto y tips de uso
 
-Las lecciones son generadas por IA (Amazon Nova Micro vía Bedrock) y entregadas a múltiples destinatarios en WhatsApp vía Twilio.
+Las lecciones son generadas por IA (Amazon Nova Micro vía Bedrock) y publicadas automáticamente en un grupo de Telegram.
 
 ---
 
@@ -15,13 +16,13 @@ Las lecciones son generadas por IA (Amazon Nova Micro vía Bedrock) y entregadas
 ```
 GitHub Actions (CI/CD)
     └── Terraform → AWS
-            ├── EventBridge Scheduler (8am / 3pm COT)
+            ├── EventBridge Scheduler (9:30am / 2:30pm / 8:30pm COT — Lun a Sáb)
             │       └── Lambda (orquestador)
-            │               ├── S3 (lista de verbos)
-            │               ├── DynamoDB (log de verbos enviados)
+            │               ├── S3 (listas de verbos y vocabulario)
+            │               ├── DynamoDB (estado — evita repetir items)
             │               ├── Bedrock / Nova Micro (generación con IA)
             │               ├── SSM Parameter Store (credenciales)
-            │               └── Twilio API → WhatsApp
+            │               └── Telegram Bot API → Grupo de Telegram
             └── Observabilidad
                     ├── CloudWatch Dashboard
                     ├── Alarmas (errores, duración, zero invocations)
@@ -36,11 +37,11 @@ GitHub Actions (CI/CD)
 | CI/CD | GitHub Actions + OIDC (sin access keys) |
 | Cómputo | AWS Lambda (Python 3.12) |
 | IA | Amazon Bedrock — Amazon Nova Micro |
-| Almacenamiento | S3 (lista de verbos), DynamoDB (estado) |
+| Almacenamiento | S3 (listas de items), DynamoDB (estado) |
 | Secretos | SSM Parameter Store |
-| Scheduling | EventBridge Scheduler |
-| Mensajería | Twilio WhatsApp API |
-| Observabilidad | CloudWatch Dashboard + Alarmas + SNS |
+| Scheduling | EventBridge Scheduler (Lun-Sáb) |
+| Mensajería | Telegram Bot API |
+| Observabilidad | CloudWatch Dashboard + Alarmas + SNS Email |
 
 ---
 
@@ -57,11 +58,11 @@ english-bot/
 │   ├── outputs.tf
 │   └── terraform.tfvars
 ├── modules/                    # Módulos reutilizables
-│   ├── s3/                     # Bucket para lista de verbos
-│   ├── dynamodb/               # Tabla de log de verbos enviados
+│   ├── s3/                     # Bucket para listas de verbos y vocabulario
+│   ├── dynamodb/               # Tabla de estado (items ya enviados)
 │   ├── iam/                    # Rol y políticas para Lambda
 │   ├── lambda/                 # Función Lambda orquestadora
-│   ├── scheduler/              # EventBridge Schedules AM y PM
+│   ├── scheduler/              # EventBridge Schedules (3 tareas, Lun-Sáb)
 │   └── observability/          # Dashboard, alarmas y SNS
 ├── environments/
 │   └── dev/                    # Environment de desarrollo
@@ -73,7 +74,7 @@ english-bot/
 │   ├── handler.py              # Orquestador principal
 │   ├── verb_selector.py        # Selección aleatoria sin repetir
 │   ├── bedrock_generator.py    # Generación de lecciones con IA
-│   └── whatsapp_sender.py      # Envío a WhatsApp vía Twilio
+│   └── telegram_sender.py      # Publicación en grupo de Telegram
 └── scripts/
     ├── test_local.py           # Pruebas locales sin deploy
     └── enable_bedrock.sh       # Verificación de acceso a Bedrock
@@ -87,7 +88,7 @@ english-bot/
 - Terraform >= 1.6.0
 - Python 3.12 + pip
 - Cuenta GitHub con el repo creado
-- Cuenta Twilio con sandbox de WhatsApp activo
+- Bot de Telegram creado con @BotFather
 
 ---
 
@@ -123,28 +124,45 @@ terraform init
 terraform apply
 ```
 
-### 5. Cargar credenciales de Twilio en SSM
+### 5. Cargar credenciales en SSM
 
 ```bash
+# Telegram
 aws ssm put-parameter \
-  --name "/english-bot/dev/twilio_account_sid" \
-  --value "ACxxxxxxxxxxxxxxxx" \
+  --name "/english-bot/dev/telegram_bot_token" \
+  --value "TU_BOT_TOKEN" \
   --type SecureString --overwrite
 
 aws ssm put-parameter \
-  --name "/english-bot/dev/twilio_auth_token" \
-  --value "tu_auth_token" \
-  --type SecureString --overwrite
-
-aws ssm put-parameter \
-  --name "/english-bot/dev/whatsapp_recipients" \
-  --value "whatsapp:+57XXX,whatsapp:+57YYY" \
+  --name "/english-bot/dev/telegram_chat_id" \
+  --value "-100XXXXXXXXXX" \
   --type String --overwrite
 ```
 
 ### 6. Confirmar suscripción email de SNS
 
-Después del apply, AWS envía un email con asunto `AWS Notification - Subscription Confirmation`. Haz clic en el link para activar las alertas por email.
+Después del apply, AWS envía un email con asunto `AWS Notification - Subscription Confirmation`. Haz clic en el link para activar las alertas.
+
+---
+
+## Configurar el bot de Telegram
+
+### 1. Crear el bot
+
+1. Abre Telegram y busca `@BotFather`
+2. Envía `/newbot` y sigue las instrucciones
+3. Guarda el token que te entrega BotFather
+
+### 2. Crear el grupo y obtener el Chat ID
+
+1. Crea un grupo en Telegram y agrega el bot como administrador
+2. Envía un mensaje en el grupo
+3. Obtén el Chat ID:
+
+```bash
+curl "https://api.telegram.org/botTU_TOKEN/getUpdates"
+# Busca el campo "chat":{"id": ...} — será un número negativo
+```
 
 ---
 
@@ -196,20 +214,36 @@ Merge a main → terraform apply automático
 python3 -m venv .venv && source .venv/bin/activate
 pip install boto3
 
-# Dry-run (genera lección sin enviar a WhatsApp)
+# Dry-run (genera lección sin publicar en Telegram)
+python3 scripts/test_local.py --type vocabulary --dry-run
 python3 scripts/test_local.py --type irregular_verbs --dry-run
 python3 scripts/test_local.py --type phrasal_verbs --dry-run
 
-# Prueba completa con envío real
-python3 scripts/test_local.py --type irregular_verbs
+# Prueba completa con publicación real en Telegram
+python3 scripts/test_local.py --type vocabulary
 ```
 
 ## Invocar la Lambda manualmente
 
 ```bash
+# Vocabulario
 aws lambda invoke \
   --function-name english-bot-dev-bot \
-  --payload '{"lesson_type":"irregular_verbs","schedule":"morning"}' \
+  --payload '{"lesson_type":"vocabulary","schedule":"morning"}' \
+  --cli-binary-format raw-in-base64-out \
+  response.json && cat response.json
+
+# Verbos irregulares
+aws lambda invoke \
+  --function-name english-bot-dev-bot \
+  --payload '{"lesson_type":"irregular_verbs","schedule":"afternoon"}' \
+  --cli-binary-format raw-in-base64-out \
+  response.json && cat response.json
+
+# Phrasal verbs
+aws lambda invoke \
+  --function-name english-bot-dev-bot \
+  --payload '{"lesson_type":"phrasal_verbs","schedule":"evening"}' \
   --cli-binary-format raw-in-base64-out \
   response.json && cat response.json
 
@@ -242,6 +276,29 @@ aws cloudwatch describe-alarms \
 
 ---
 
+## Resetear el estado de un tipo de lección
+
+Si quieres que el bot vuelva a empezar desde el principio de la lista:
+
+```bash
+# Resetear vocabulario
+aws dynamodb delete-item \
+  --table-name english-bot-sent-log-dev \
+  --key '{"PK": {"S": "vocabulary"}, "SK": {"S": "state"}}'
+
+# Resetear verbos irregulares
+aws dynamodb delete-item \
+  --table-name english-bot-sent-log-dev \
+  --key '{"PK": {"S": "irregular_verbs"}, "SK": {"S": "state"}}'
+
+# Resetear phrasal verbs
+aws dynamodb delete-item \
+  --table-name english-bot-sent-log-dev \
+  --key '{"PK": {"S": "phrasal_verbs"}, "SK": {"S": "state"}}'
+```
+
+---
+
 ## Destruir la infraestructura
 
 ```bash
@@ -260,11 +317,10 @@ terraform destroy
 
 ---
 
-## Fases del proyecto
+## Lecciones del día
 
-| Fase | Descripción |
-|------|-------------|
-| 1 | Infraestructura base con Terraform modular + CI/CD con GitHub Actions + OIDC |
-| 2 | Lambda + Amazon Bedrock (Nova Micro) + selección aleatoria sin repetir |
-| 3 | Integración WhatsApp vía Twilio + múltiples destinatarios + secretos en SSM |
-| 4 | CloudWatch Dashboard + alarmas + notificaciones SNS por email |
+| Hora (COT) | Días | Tipo | Items |
+|-----------|------|------|-------|
+| 9:30am | Lun — Sáb | Vocabulario B2/C1 | 3 palabras |
+| 2:30pm | Lun — Sáb | Verbos irregulares | 2 verbos |
+| 8:30pm | Lun — Sáb | Phrasal verbs | 2 phrasal verbs |
