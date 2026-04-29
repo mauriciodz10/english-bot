@@ -1,5 +1,12 @@
 """
-handler.py — Fase 3 (multi-destinatario)
+handler.py — Fase final
+Orquestador principal de la Lambda del English Bot.
+
+Flujo:
+  1. Recibe evento de EventBridge Scheduler (lesson_type + schedule)
+  2. VerbSelector elige items sin repetir (S3 + DynamoDB)
+  3. BedrockGenerator produce la explicación con Amazon Nova Micro
+  4. TelegramSender publica el mensaje en el grupo de Telegram
 """
 
 import json
@@ -8,11 +15,12 @@ import os
 
 from bedrock_generator import BedrockGenerator
 from verb_selector import VerbSelector
-from whatsapp_sender import WhatsAppSender
+from telegram_sender import TelegramSender
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# ── Variables de entorno ──────────────────────────────────────────────────────
 S3_BUCKET        = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE   = os.environ["DYNAMODB_TABLE"]
 AWS_REGION_NAME  = os.environ["AWS_REGION_NAME"]
@@ -20,6 +28,7 @@ BEDROCK_MODEL_ID = os.environ["BEDROCK_MODEL_ID"]
 SSM_PREFIX       = os.environ["SSM_PREFIX"]
 ENVIRONMENT      = os.environ.get("ENVIRONMENT", "dev")
 
+# ── Clientes (reutilización entre invocaciones) ───────────────────────────────
 verb_selector = VerbSelector(
     s3_bucket      = S3_BUCKET,
     dynamodb_table = DYNAMODB_TABLE,
@@ -31,7 +40,7 @@ bedrock_generator = BedrockGenerator(
     aws_region = AWS_REGION_NAME,
 )
 
-whatsapp_sender = WhatsAppSender(
+telegram_sender = TelegramSender(
     ssm_prefix = SSM_PREFIX,
     aws_region = AWS_REGION_NAME,
 )
@@ -40,6 +49,7 @@ whatsapp_sender = WhatsAppSender(
 def lambda_handler(event: dict, context) -> dict:
     logger.info("english-bot invocado | event: %s", json.dumps(event))
 
+    # ── 1. Validar evento ─────────────────────────────────────────────────────
     lesson_type = event.get("lesson_type")
     schedule    = event.get("schedule")
 
@@ -48,38 +58,36 @@ def lambda_handler(event: dict, context) -> dict:
 
     logger.info("Procesando lección — tipo: %s | horario: %s", lesson_type, schedule)
 
-    # 1. Seleccionar verbos
-    selected_verbs, cycle = verb_selector.select(lesson_type, count=2)
-    logger.info("Verbos seleccionados: %s | Ciclo: %d", selected_verbs, cycle)
+    # ── 2. Seleccionar items ──────────────────────────────────────────────────
+    count          = 3 if lesson_type == "vocabulary" else 2
+    selected_items, cycle = verb_selector.select(lesson_type, count=count)
+    logger.info("Items seleccionados: %s | Ciclo: %d", selected_items, cycle)
 
-    # 2. Generar lección con Bedrock
-    lesson_content = bedrock_generator.generate(lesson_type, selected_verbs)
+    # ── 3. Generar lección con Bedrock ────────────────────────────────────────
+    lesson_content = bedrock_generator.generate(lesson_type, selected_items)
 
-    # 3. Construir mensaje
-    whatsapp_message = bedrock_generator.build_whatsapp_message(
+    # ── 4. Construir mensaje ──────────────────────────────────────────────────
+    message = bedrock_generator.build_whatsapp_message(
         lesson_type    = lesson_type,
-        verbs          = selected_verbs,
+        verbs          = selected_items,
         lesson_content = lesson_content,
         cycle          = cycle,
     )
 
-    # 4. Enviar a todos los destinatarios
-    results    = whatsapp_sender.send(whatsapp_message)
-    successful = [r for r in results if r["status"] != "failed"]
-    failed     = [r for r in results if r["status"] == "failed"]
+    # ── 5. Enviar a Telegram ──────────────────────────────────────────────────
+    result = telegram_sender.send(message)
 
     logger.info(
-        "Lección enviada — tipo: %s | verbos: %s | exitosos: %d | fallidos: %d",
-        lesson_type, selected_verbs, len(successful), len(failed),
+        "Lección enviada — tipo: %s | items: %s | telegram_msg_id: %s",
+        lesson_type, selected_items, result["message_id"],
     )
 
     return {
         "statusCode":      200,
         "lesson_type":     lesson_type,
-        "verbs_selected":  selected_verbs,
+        "items_selected":  selected_items,
         "cycle":           cycle,
-        "sent_count":      len(successful),
-        "failed_count":    len(failed),
-        "results":         results,
-        "phase":           "3 - whatsapp multi-recipient OK",
+        "telegram_msg_id": result["message_id"],
+        "status":          result["status"],
+        "phase":           "final - telegram delivery OK",
     }
