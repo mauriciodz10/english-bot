@@ -22,9 +22,10 @@ IRREGULAR_VERB_PROMPT = """Eres un profesor de inglés experto. Genera una lecci
 Crea una explicación para los siguientes verbos irregulares en inglés: {verbs}
 
 Para CADA verbo incluye:
-1. *Verbo:* forma base | past simple | past participle
-2. *Significado:* traducción al español en una línea
-3. Los siguientes tiempos con UN ejemplo cada uno:
+1. *Verbo:* base form | past simple | past participle
+2. *Fonetica* —  base form | past simple | past participle
+3. *Significado:* traducción al español en una línea
+4. Los siguientes tiempos con UN ejemplo cada uno:
    - *Present simple:* (oración afirmativa)
    - *Past simple:* (oración afirmativa)
    - *Present perfect:* (con have/has)
@@ -46,6 +47,7 @@ Crea una explicación para los siguientes phrasal verbs en inglés: {verbs}
 
 Para CADA phrasal verb incluye:
 1. *Phrasal verb:* en negrita
+2. *Fonetica:* fonetica del phrasal verb
 2. *Significado:* traducción al español + explicación breve de cuándo usarlo
 3. *3 ejemplos en inglés* en diferentes contextos (formal, informal, laboral)
 4. *Expresiones relacionadas:* 1 o 2 frases similares
@@ -67,6 +69,7 @@ Palabras de hoy: {words}
 Para CADA palabra usa exactamente este formato:
 
 🔹 *PALABRA* — traducción
+🔊 *PALABRA* — Fonetica/pronunciacion
 📌 Nivel: B2 / C1
 💬 Uso: una línea corta explicando en qué contexto se usa
 • Ejemplo: oración natural en inglés

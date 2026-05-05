@@ -69,7 +69,7 @@ resource "aws_scheduler_schedule" "afternoon" {
     mode = "OFF"
   }
 
-  schedule_expression          = "cron(30 19 ? * 2-7 *)"
+  schedule_expression          = "cron(30 9 ? * 2-7 *)"
   schedule_expression_timezone = "America/Bogota"
 
   target {
@@ -92,7 +92,7 @@ resource "aws_scheduler_schedule" "evening" {
     mode = "OFF"
   }
 
-  schedule_expression          = "cron(30 1 ? * 2-7 *)"
+  schedule_expression          = "cron(30 20 ? * 2-7 *)"
   schedule_expression_timezone = "America/Bogota"
 
   target {
