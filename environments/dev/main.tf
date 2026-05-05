@@ -176,3 +176,9 @@ resource "aws_ssm_parameter" "telegram_chat_id" {
     ignore_changes = [value]
   }
 }
+
+resource "aws_ssm_parameter" "moni_esta_aprendiendo" {
+  name  = "/${var.project_name}/${var.environment}/moni_esta_aprendiendo"
+  type  = "String"
+  value = "patooooooooo"
+}
