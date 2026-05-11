@@ -1,12 +1,6 @@
 """
 bedrock_generator.py
 Genera las explicaciones de inglés usando Amazon Bedrock (Amazon Nova Micro).
-
-Nota: Amazon Nova usa un formato de request diferente al de Anthropic.
-  - messages[].content es una lista de objetos: [{"text": "..."}]
-  - inferenceConfig en lugar de max_tokens al nivel raíz
-  - Response en body["output"]["message"]["content"][0]["text"]
-  - Tokens en body["usage"]["inputTokens"] / "outputTokens"
 """
 
 import json
@@ -17,70 +11,85 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
-IRREGULAR_VERB_PROMPT = """Eres un profesor de inglés experto. Genera una lección diaria de inglés para un estudiante hispanohablante de nivel intermedio.
+IRREGULAR_VERB_PROMPT = """Eres un profesor de inglés cercano y motivador. Crea una cápsula de aprendizaje diaria para un hispanohablante de nivel intermedio.
 
-Crea una explicación para los siguientes verbos irregulares en inglés: {verbs}
+Verbos de hoy: {verbs}
 
-Para CADA verbo incluye:
-1. *Verbo:* base form | past simple | past participle
-2. *Fonetica* —  base form | past simple | past participle
-3. *Significado:* traducción al español en una línea
-4. Los siguientes tiempos con UN ejemplo cada uno:
-   - *Present simple:* (oración afirmativa)
-   - *Past simple:* (oración afirmativa)
-   - *Present perfect:* (con have/has)
-   - *Past continuous:* (con was/were + ing)
-   - *Future simple:* (con will)
+Para CADA verbo usa este formato:
 
-Formato de salida:
-- Usa *texto* para negrita
-- Usa emojis para hacer la lección más visual
-- Separa cada verbo con una línea de guiones ---
-- Al final agrega un tip de uso común en inglés cotidiano
+🔹 *VERBO* — traducción
+🔊 Pronunciación: escribe cómo suena en español aproximado
+_(Ej: "go" → "gou" | "went" → "uent" | "gone" → "gon")_
+📝 *Formas:* base form | past simple | past participle
+_(IMPORTANTE: escribe siempre las 3 formas reales. Ej: go | went | gone)_
 
-Responde SOLO con el contenido de la lección, sin introducciones ni despedidas.
-IMPORTANTE: el texto completo no debe superar 1200 caracteres."""
+⏱ *En acción:*
+• 🟢 Present: oración corta
+• 🟡 Past: oración corta
+• 🔵 Present perfect: oración corta
+• 🟠 Past continuous: oración corta
+• 🔴 Future: oración corta
 
-PHRASAL_VERB_PROMPT = """Eres un profesor de inglés experto. Genera una lección diaria de inglés para un estudiante hispanohablante de nivel intermedio.
+⚠️ *Error común:* describe el error + explica brevemente por qué ocurre y cómo evitarlo
 
-Crea una explicación para los siguientes phrasal verbs en inglés: {verbs}
+---
 
-Para CADA phrasal verb incluye:
-1. *Phrasal verb:* en negrita
-2. *Fonetica:* fonetica del phrasal verb
-2. *Significado:* traducción al español + explicación breve de cuándo usarlo
-3. *3 ejemplos en inglés* en diferentes contextos (formal, informal, laboral)
-4. *Expresiones relacionadas:* 1 o 2 frases similares
+Reglas:
+- Oraciones de máximo 8 palabras
+- La pronunciación usa letras españolas para aproximar el sonido real
+- Sin introducciones ni despedidas
+- El texto completo no debe superar 1200 caracteres."""
 
-Formato de salida:
-- Usa *texto* para negrita
-- Usa emojis para hacer la lección más visual
-- Separa cada phrasal verb con una línea de guiones ---
-- Al final agrega una nota sobre registro (formal/informal)
+PHRASAL_VERB_PROMPT = """Eres un profesor de inglés cercano y motivador. Crea una cápsula de aprendizaje diaria para un hispanohablante de nivel intermedio.
 
-Responde SOLO con el contenido de la lección, sin introducciones ni despedidas.
-IMPORTANTE: el texto completo no debe superar 1200 caracteres."""
+Phrasal verbs de hoy: {verbs}
 
+Para CADA phrasal verb usa este formato:
 
-VOCABULARY_PROMPT = """Eres un profesor de inglés cercano y motivador. Crea una cápsula de vocabulario para un estudiante hispanohablante que quiere alcanzar nivel B2-C1.
+🔹 *PHRASAL VERB* — traducción
+🔊 Pronunciación: escribe cómo suena en español aproximado
+_(Ej: "break down" → "breik daun")_
+📌 Cuándo usarlo: una línea corta
+
+💬 *Ejemplos:*
+• 💼 Trabajo: oración corta
+• 🏠 Cotidiano: oración corta
+• 😄 Informal: oración corta
+
+⚠️ *Error común:* describe el error + explica brevemente por qué ocurre y cómo evitarlo
+🔗 *Similar:* 1 expresión relacionada
+
+---
+
+Reglas:
+- Ejemplos de máximo 8 palabras
+- La pronunciación usa letras españolas para aproximar el sonido real
+- Sin introducciones ni despedidas
+- El texto completo no debe superar 1200 caracteres."""
+
+VOCABULARY_PROMPT = """Eres un profesor de inglés cercano y motivador. Crea una cápsula de vocabulario para un hispanohablante que quiere alcanzar nivel B2-C1.
 
 Palabras de hoy: {words}
 
-Para CADA palabra usa exactamente este formato:
+Para CADA palabra usa este formato:
 
 🔹 *PALABRA* — traducción
-🔊 *PALABRA* — Fonetica/pronunciacion
+🔊 Pronunciación: escribe cómo suena en español aproximado
+_(Ej: "achieve" → "a-CHIIV" | "nuance" → "NIU-ans")_
 📌 Nivel: B2 / C1
-💬 Uso: una línea corta explicando en qué contexto se usa
+💬 Cuándo usarlo: una línea corta
 • Ejemplo: oración natural en inglés
 
-Separa cada palabra con ---
+⚠️ *Error común:* describe el error + explica brevemente por qué ocurre y cómo evitarlo
+
+---
 
 Reglas:
 - Ejemplos de máximo 10 palabras
-- Palabras sofisticadas pero de uso real (no arcaicas)
+- La pronunciación usa letras españolas para aproximar el sonido real
 - Sin introducciones ni despedidas
 - El texto completo no debe superar 1200 caracteres."""
+
 
 class BedrockGenerator:
     def __init__(self, model_id: str, aws_region: str):
@@ -150,11 +159,11 @@ class BedrockGenerator:
         cycle: int,
     ) -> str:
         headers = {
-            "irregular_verbs": "🇬🇧 *Lección de hoy — Verbos Irregulares* 📚",
-            "phrasal_verbs":   "🇬🇧 *Lección de hoy — Phrasal Verbs* 💬",
+            "irregular_verbs": "🇬🇧 *Verbos del día* 📚",
+            "phrasal_verbs":   "🇬🇧 *Phrasal Verbs del día* 💬",
             "vocabulary":      "🇬🇧 *Vocabulario del día — B2/C1* 🧠",
         }
-        header        = headers.get(lesson_type, "🇬🇧 *Lección de inglés*")
+        header        = headers.get(lesson_type, "🇬🇧 *Inglés del día*")
         verbs_display = " & ".join(f"*{v}*" for v in verbs)
 
         return (
